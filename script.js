@@ -1,131 +1,138 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+let size = 400;
+let minBallSize = size * 0.01;
+let maxBallSize = size * 0.02;
+let maxV = size * 0.003;
 
-// Add background text
-const bgText = document.createElement('div');
-bgText.id = 'backgroundText';
-bgText.innerHTML = "NIJWM'S SNAKE GAME";
-document.body.appendChild(bgText);
+const colors = [
+  "#EF964E",
+  "#E65C19",
+  "#CE3C47",
+  "#B51B75",
+  "#8D1470",
+  "#640D6B"
+];
 
-// Game variables
-let box = 20;
-let snake = [];
-snake[0] = {
-    x: 9 * box,
-    y: 10 * box
-};
+let circles = [];
+let lines = [];
 
-let food = {
-    x: Math.floor(Math.random() * 19 + 1) * box,
-    y: Math.floor(Math.random() * 19 + 1) * box
-};
+class Circle {
+  constructor(i, x, y, radius, v) {
+    this.index = i;
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.velocity = v;
+    this.connections = [];
+  }
 
-let score = 0;
-let d;
-let eatSound = new Audio('https://www.soundjay.com/button/beep-07.wav'); // Add a sound when snake eats
-
-// Control the snake
-document.addEventListener("keydown", direction);
-
-function direction(event) {
-    if (event.keyCode == 37 && d != "RIGHT") {
-        d = "LEFT";
-    } else if (event.keyCode == 38 && d != "DOWN") {
-        d = "UP";
-    } else if (event.keyCode == 39 && d != "LEFT") {
-        d = "RIGHT";
-    } else if (event.keyCode == 40 && d != "UP") {
-        d = "DOWN";
+  update() {
+    this.x += this.velocity.x;
+    this.y += this.velocity.y;
+    if (this.x > size + this.radius) {
+      this.x = -this.radius;
+      this.y = random(size);
     }
+    if (this.x < -this.radius) {
+      this.x = size + this.radius;
+      this.y = random(size);
+    }
+    if (this.y > size + this.radius) {
+      this.y = -this.radius;
+      this.x = random(size);
+    }
+    if (this.y < -this.radius) {
+      this.y = size + this.radius;
+      this.x = random(size);
+    }
+    this.connections = [];
+  }
+
+  draw() {
+      
+    let nConnections = this.connections.length;
+    if (nConnections > colors.length - 1) nConnections = colors.length - 1;
+    stroke(colors[nConnections]);
+    fill(colors[nConnections]);
+    circle(this.x, this.y, this.radius);
+  }
 }
 
-// Check collision function
-function collision(head, array) {
-    for (let i = 0; i < array.length; i++) {
-        if (head.x == array[i].x && head.y == array[i].y) {
-            return true;
-        }
-    }
-    return false;
+function createCircles() {
+  circles = [];
+  for (let i = 0; i < size / 5; i++) {
+    const circle = new Circle(
+      i,
+      random(size),
+      random(size),
+      minBallSize + random(maxBallSize),
+      {
+        x: maxV * -0.5 + random(maxV),
+        y: maxV * -0.5 + random(maxV)
+      }
+    );
+    circles.push(circle);
+  }
 }
 
-// Draw everything to the canvas
+function setup() {
+  resize();
+  const c = createCanvas(size, size);
+  c.parent("canvas");
+}
+
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  clear();
+  for (let i = 0; i < circles.length; i++) {
+    circles[i].update();
+  }
+  detectConnections();
+  for (let i = 0; i < circles.length; i++) {
+    circles[i].draw();
+  }
 
-    for (let i = 0; i < snake.length; i++) {
-        ctx.fillStyle = (i == 0) ? "green" : "white";
-        ctx.fillRect(snake[i].x, snake[i].y, box, box);
-        ctx.strokeStyle = "red";
-        ctx.strokeRect(snake[i].x, snake[i].y, box, box);
-    }
-
-    ctx.fillStyle = "red";
-    ctx.fillRect(food.x, food.y, box, box);
-
-    // Old head position
-    let snakeX = snake[0].x;
-    let snakeY = snake[0].y;
-
-    // Which direction
-    if (d == "LEFT") snakeX -= box;
-    if (d == "UP") snakeY -= box;
-    if (d == "RIGHT") snakeX += box;
-    if (d == "DOWN") snakeY += box;
-
-    // If the snake eats the food
-    if (snakeX == food.x && snakeY == food.y) {
-        score++;
-        eatSound.play(); // Play sound when snake eats
-        createExplosion(food.x, food.y); // Create explosion effect
-
-        food = {
-            x: Math.floor(Math.random() * 19 + 1) * box,
-            y: Math.floor(Math.random() * 19 + 1) * box
-        }
-    } else {
-        // Remove the tail
-        snake.pop();
-    }
-
-    // Add new head
-    let newHead = {
-        x: snakeX,
-        y: snakeY
-    };
-
-    // Game over
-    if (snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height || collision(newHead, snake)) {
-        clearInterval(game);
-        alert('Game Over! Your score: ' + score);
-    }
-
-    snake.unshift(newHead);
-
-    // Score display
-    ctx.fillStyle = "white";
-    ctx.font = "45px Changa one";
-    ctx.fillText(score, 2 * box, 1.6 * box);
+  for (let i = 0; i < lines.length; i++) {
+    const a = circles[lines[i][0]];
+    const b = circles[lines[i][1]];
+    let nConnections = max(a.connections.length, b.connections.length);
+    if (nConnections > colors.length - 1) nConnections = colors.length - 1;
+      
+    const c = color(colors[nConnections]);
+    c.setAlpha(20);
+    stroke(c);
+    line(a.x, a.y, b.x, b.y);
+  }
 }
 
-// Create explosion effect
-function createExplosion(x, y) {
-    const explosion = document.createElement('div');
-    explosion.style.position = 'absolute';
-    explosion.style.left = `${x}px`;
-    explosion.style.top = `${y}px`;
-    explosion.style.width = '20px';
-    explosion.style.height = '20px';
-    explosion.style.backgroundColor = 'yellow';
-    explosion.style.borderRadius = '50%';
-    explosion.style.zIndex = 2;
-    explosion.style.pointerEvents = 'none';
-    document.body.appendChild(explosion);
-
-    setTimeout(() => {
-        explosion.remove();
-    }, 300);
+function detectConnections() {
+  lines = [];
+  for (let a = 0; a < circles.length; a++) {
+    for (let b = 0; b < circles.length; b++) {
+      if (a === b) continue;
+      const d = dist(circles[a].x, circles[a].y, circles[b].x, circles[b].y);
+      if (d < size * 0.1) {
+        circles[a].connections.push(b);
+        circles[b].connections.push(a);
+        lines.push([a, b]);
+      }
+    }
+  }
 }
 
-// Call draw function every 100 ms
-let game = setInterval(draw, 100);
+function resize() {
+  if (windowWidth < 400) {
+    size = windowWidth * 0.8;
+  } else {
+    size = 400;
+  }
+  minBallSize = size * 0.01;
+  maxBallSize = size * 0.02;
+  maxV = size * 0.003;
+  resizeCanvas(size, size);
+  createCircles();
+}
+
+function windowResized() {
+  resize();
+}
+
+requestAnimationFrame(() => {});
